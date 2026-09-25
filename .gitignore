@@ -5,8 +5,9 @@ build/
 dist/
 wheels/
 *.egg-info
+*.exe
 *.spec
-*.ini
+*.iss
 
 # Virtual environments
 .venv

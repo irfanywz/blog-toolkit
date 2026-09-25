@@ -20,23 +20,38 @@ class MasterImageTools(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self):
         super().__init__()
         self.TkdndVersion = TkinterDnD._require(self)
-        self.title("Image Tools SatSet Pro")
-        self.geometry("700x460")
+        self.title("Blog Toolkit")
+        self.geometry("700x500")
         self.resizable(False, False)
         
         self.icon_path = resource_path("logo.ico")
         if os.path.exists(self.icon_path):
-            self.iconbitmap(self.icon_path)
+            try:
+                self.iconbitmap(self.icon_path)
+            except Exception:
+                pass
 
         self.config_dir = os.path.dirname(os.path.abspath(__file__))
 
-        # --- HEADER TITLE ---
+        # --- HEADER DENGAN LOGO ---
+        header_frame = ctk.CTkFrame(self, fg_color="transparent")
+        header_frame.pack(pady=(15, 8))
+
+        if os.path.exists(self.icon_path):
+            try:
+                pil_icon = Image.open(self.icon_path)
+                self.header_logo_img = ctk.CTkImage(light_image=pil_icon, dark_image=pil_icon, size=(28, 28))
+                logo_lbl = ctk.CTkLabel(header_frame, image=self.header_logo_img, text="")
+                logo_lbl.pack(side="left", padx=(0, 10))
+            except Exception:
+                pass
+
         header_lbl = ctk.CTkLabel(
-            self, 
-            text="⚡ IMAGE TOOLS SATSET", 
+            header_frame, 
+            text="BLOG TOOLKIT", 
             font=("Arial Bold", 16)
         )
-        header_lbl.pack(pady=(12, 5))
+        header_lbl.pack(side="left")
 
         # --- MAIN CONTAINER (Card Layout Kiri & Kanan) ---
         main_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -216,7 +231,6 @@ class MasterImageTools(ctk.CTk, TkinterDnD.DnDWrapper):
             images[0].save(
                 output_path,
                 format=chosen_format,
-            
                 save_all=True,
                 append_images=images[1:],
                 duration=duration_ms,

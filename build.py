@@ -1,13 +1,18 @@
 import PyInstaller.__main__
 import os
 import subprocess
+import uuid
+import textwrap
+import re
 
 APP_NAME = "Blog Toolkit"
 SCRIPT_FILE = "main.py" 
 ICON_FILE = "logo.ico"
 
 def build():
-    # 1. Proses PyInstaller
+    imported_modules = set()
+
+    # 1. Konfigurasi Dasar PyInstaller
     add_data_path = f"{ICON_FILE};." 
 
     params = [
@@ -19,9 +24,11 @@ def build():
         f'--add-data={add_data_path}',
         '--collect-all=tkinterdnd2',
         '--collect-all=customtkinter',
-        '--collect-all=pillow_avif',
-        '--hidden-import=pystray._win32',
     ]
+
+    # Masukkan semua modul yang terdeteksi secara otomatis sebagai hidden-import
+    for mod in imported_modules:
+        params.append(f'--hidden-import={mod}')
 
     if os.path.exists(ICON_FILE):
         params.append(f'--icon={ICON_FILE}')
@@ -29,48 +36,61 @@ def build():
     print("🚀 Sedang memproses PyInstaller...")
     PyInstaller.__main__.run(params)
 
-    # 2. Buat file script Inno Setup secara otomatis (.iss)
-    iss_content = f"""
-#define MyAppName "{APP_NAME}"
-#define MyAppVersion "1.0"
-#define MyAppPublisher "Irfan"
-#define MyAppExeName "{APP_NAME}.exe"
+    # 2. Kelola AppId persisten (Cek app-id.txt, buat jika belum ada)
+    app_id_file = "app-id.txt"
+    if os.path.exists(app_id_file):
+        with open(app_id_file, "r") as f:
+            dynamic_app_id = f.read().strip()
+        print(f"🔑 Menggunakan AppId yang ada dari {app_id_file}")
+    else:
+        dynamic_app_id = f"{{{str(uuid.uuid4()).upper()}}}"
+        with open(app_id_file, "w") as f:
+            f.write(dynamic_app_id)
+        print(f"✨ AppId baru berhasil digenerate dan disimpan ke {app_id_file}")
 
-[Setup]
-AppId={{{{8E3A1C2B-4F5D-6E7A-8B9C-0D1E2F3A4B5C}}}}
-AppName={{#MyAppName}}
-AppVersion={{#MyAppVersion}}
-AppPublisher={{#MyAppPublisher}}
-DefaultDirName={{autopf}}\\{{#MyAppName}}
-DisableProgramGroupPage=yes
-OutputDir=.
-OutputBaseFilename={{#MyAppName}}_Setup
-SetupIconFile={ICON_FILE}
-Compression=lzma
-SolidCompression=yes
-WizardStyle=modern
+    # 3. Buat file script Inno Setup secara otomatis (.iss)
+    iss_content = textwrap.dedent(f"""\
+    #define MyAppName "{APP_NAME}"
+    #define MyAppVersion "1.0"
+    #define MyAppPublisher "irfanywz"
+    #define MyAppExeName "{APP_NAME}.exe"
 
-[Languages]
-Name: "english"; MessagesFile: "compiler:Default.isl"
+    [Setup]
+    AppId={{{dynamic_app_id}}}
+    AppName={{#MyAppName}}
+    AppVersion={{#MyAppVersion}}
+    AppPublisher={{#MyAppPublisher}}
+    DefaultDirName={{localappdata}}\\{{#MyAppPublisher}}\\{{#MyAppName}}
+    PrivilegesRequired=lowest
+    DisableProgramGroupPage=yes
+    OutputDir=.
+    OutputBaseFilename={{#MyAppName}}_Setup
+    SetupIconFile={ICON_FILE}
+    Compression=lzma
+    SolidCompression=yes
+    WizardStyle=modern
 
-[Files]
-Source: "dist\\{{#MyAppName}}\\*"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs
+    [Languages]
+    Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Icons]
-Name: "{{autodesktop}}\\{{#MyAppName}}"; Filename: "{{app}}\\{{#MyAppExeName}}"; Tasks: desktopicon
+    [Files]
+    Source: "dist\\{{#MyAppName}}\\*"; DestDir: "{{app}}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-[Tasks]
-Name: "desktopicon"; Description: "{{cm:CreateDesktopIcon}}"; GroupDescription: "{{cm:AdditionalIcons}}"; Flags: unchecked
+    [Icons]
+    Name: "{{autodesktop}}\\{{#MyAppName}}"; Filename: "{{app}}\\{{#MyAppExeName}}"; Tasks: desktopicon
 
-[Run]
-Filename: "{{app}}\\{{#MyAppExeName}}"; Description: "{{cm:LaunchProgram,{{#StringChange(MyAppName, '&', '&&')}}}}"; Flags: nowait postinstall skipifsilent
-"""
+    [Tasks]
+    Name: "desktopicon"; Description: "{{cm:CreateDesktopIcon}}"; GroupDescription: "{{cm:AdditionalIcons}}"; Flags: unchecked
+
+    [Run]
+    Filename: "{{app}}\\{{#MyAppExeName}}"; Description: "{{cm:LaunchProgram,{{#StringChange(MyAppName, '&', '&&')}}}}"; Flags: nowait postinstall skipifsilent
+    """)
 
     iss_path = "installer.iss"
     with open(iss_path, "w") as f:
         f.write(iss_content)
 
-    # 3. Cari lokasi compiler Inno Setup (ISCC.exe) secara otomatis di Windows
+    # 4. Cari lokasi compiler Inno Setup (ISCC.exe) secara otomatis di Windows
     inno_compiler = r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
     if not os.path.exists(inno_compiler):
         inno_compiler = r"C:\Program Files\Inno Setup 6\ISCC.exe"
