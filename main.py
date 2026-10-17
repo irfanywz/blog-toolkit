@@ -2,7 +2,7 @@ import customtkinter as ctk
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from PIL import Image
 import pillow_avif
-import os, sys, threading, re, configparser, pystray
+import os, sys, threading, re, configparser, pystray, webbrowser
 from pystray import MenuItem as item
 
 def resource_path(relative_path):
@@ -214,13 +214,22 @@ class MasterImageTools(ctk.CTk, TkinterDnD.DnDWrapper):
 
     def work_anim(self, files):
         try:
-            self.after(0, lambda: self.update_status_anim("Merakit animasi..."))
+            self.after(0, lambda: self.update_status_anim("Menyesuaikan resolusi & merakit..."))
             duration_ms = int(float(self.dur_slider.get()) * 1000)
             chosen_format = self.format_picker.get()
             
             images = []
+            base_size = None
+            
             for i, p in enumerate(files):
                 img = Image.open(p).convert("RGBA")
+                
+                # Menyamakan ukuran resolusi otomatis berdasarkan gambar pertama
+                if base_size is None:
+                    base_size = img.size
+                elif img.size != base_size:
+                    img = img.resize(base_size, Image.Resampling.LANCZOS)
+                    
                 images.append(img)
                 progress = (i + 1) / len(files) * 0.8
                 self.after(0, lambda prog=progress: self.p_bar_a.set(prog))
@@ -239,23 +248,67 @@ class MasterImageTools(ctk.CTk, TkinterDnD.DnDWrapper):
 
             self.after(0, lambda: self.p_bar_a.set(1.0))
             self.after(0, lambda: self.update_status_anim("BERHASIL DIRAKIT!"))
-        except Exception:
+        except Exception as e:
             self.after(0, lambda: self.update_status_anim("Gagal Merakit!"))
         
         self.after(3000, lambda: self.update_status_anim())
         self.after(3000, lambda: self.p_bar_a.set(0))
 
 
-    # ==================== SYSTEM TRAY ====================
+    # ==================== SYSTEM TRAY & ABOUT ====================
     def create_tray_icon(self):
         if os.path.exists(self.icon_path):
             icon_img = Image.open(self.icon_path)
         else:
             icon_img = Image.new('RGB', (64, 64), color=(30, 144, 255))
             
-        menu = (item('Show', self.show_window, default=True), item('Exit', self.exit_app))
-        self.tray_icon = pystray.Icon("image_tools", icon_img, "Image Tools SatSet", menu)
+        menu = (
+            item('Show', self.show_window, default=True),
+            item('About & Changelog', self.show_about_dialog),
+            item('Exit', self.exit_app)
+        )
+        self.tray_icon = pystray.Icon("image_tools", icon_img, "Blog Toolkit", menu)
         threading.Thread(target=self.tray_icon.run, daemon=True).start()
+
+    def show_about_dialog(self):
+        # Membuka jendela pop-up CTkToplevel untuk informasi aplikasi dan changelog
+        def open_popup():
+            dialog = ctk.CTk() # Atau CTkToplevel jika jendela utama aktif, tapi aman pakai CTkToplevel dari root utama
+            dialog.destroy() # Bersihkan dummy
+            
+        self.after(0, self._build_about_window)
+
+    def _build_about_window(self):
+        about_win = ctk.CTkToplevel(self)
+        about_win.title("About & Changelog - Blog Toolkit")
+        about_win.geometry("450x420")
+        about_win.resizable(False, False)
+        about_win.attributes("-topmost", True)
+
+        # Judul Info
+        ctk.CTkLabel(about_win, text="📌 Blog Toolkit v1.1", font=("Arial Bold", 15), text_color="#3abff8").pack(pady=(15, 5))
+        ctk.CTkLabel(about_win, text="Aplikasi ringan untuk konversi gambar & pembuatan animasi media web.", font=("Arial", 11), text_color="#a6adbb").pack(pady=(0, 10))
+
+        # Kotak Teks / Changelog
+        changelog_box = ctk.CTkTextbox(about_win, width=410, height=250, corner_radius=8, fg_color=("#222630", "#1a1d24"))
+        changelog_box.pack(padx=20, pady=5)
+        
+        info_text = """[ CHANGELOG & UPDATE ]
+
+v1.1 (Current Update):
+- Perbaikan Bug Anim Media Maker: Penambahan fitur auto-resize gambar dengan resampling LANCZOS jika resolusi/ukuran gambar yang digabungkan tidak sama.
+- Penambahan menu 'About & Changelog' pada System Tray.
+
+v1.0 (Initial Release):
+- Rilis fitur Single AVIF Converter dengan kustomisasi slider kualitas.
+- Rilis fitur Anim Media Maker (dukungan WebP & AVIF animasi).
+- Integrasi minimized to System Tray background berjalan mulus.
+"""
+        changelog_box.insert("0.0", info_text)
+        changelog_box.configure(state="disabled") # Read-only
+
+        # Tombol Tutup
+        ctk.CTkButton(about_win, text="Tutup", width=100, fg_color="#374151", hover_color="#4b5563", command=about_win.destroy).pack(pady=12)
 
     def hide_window(self): 
         self.withdraw()
