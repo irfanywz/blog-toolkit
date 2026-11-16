@@ -97,7 +97,7 @@ def build():
 
     if os.path.exists(inno_compiler):
         print("📦 Sedang mengompilasi installer .exe dengan Inno Setup...")
-        subprocess.run([inno_compiler, iss_path])
+        # subprocess.run([inno_compiler, iss_path])
         print("✨ Selesai! File installer siap di folder utama.")
     else:
         print("⚠️ Inno Setup Compiler (ISCC.exe) tidak ditemukan, pastikan Inno Setup sudah terinstal.")
